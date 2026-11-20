@@ -103,6 +103,10 @@ LaunchDialog::LaunchDialog(const QString &version, QWidget *parent)
     connect(m_assets, &AssetInstaller::progress, this, [this](qint64 done, qint64 total) {
         if (total > 0) setStep(tr("Checking game assets..."), int(done * AssetsEnd / total));
     });
+    connect(m_assets, &AssetInstaller::failed, this, [this](const QString &reason) {
+        if (m_cancelled) return;
+        fail(tr("Asset installer failed to start: %1").arg(reason));
+    });
     connect(m_assets, &AssetInstaller::finished, this, [this](bool ok) {
         if (m_cancelled) return;
         m_offline = ok;
