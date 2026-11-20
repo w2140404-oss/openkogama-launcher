@@ -22,6 +22,8 @@ QString AssetInstaller::versionOf(const QString &instancePath) {
 }
 
 void AssetInstaller::start(const QString &version) {
+    cancel();
+    m_buffer.clear();
     QDir dir(Paths::server());
     if (version.isEmpty() || !dir.exists("openkogama-server.exe")) {
         emit finished(false);
@@ -37,14 +39,27 @@ void AssetInstaller::start(const QString &version) {
     m_process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
         args->flags |= CreateNoWindow;
     });
-    connect(m_process, &QProcess::readyRead, this, &AssetInstaller::readOutput);
-    connect(m_process, &QProcess::finished, this, [this](int code, QProcess::ExitStatus status) {
-        readOutput();
-        m_process->deleteLater();
+    QProcess *process = m_process;
+    connect(process, &QProcess::readyRead, this, &AssetInstaller::readOutput);
+    // A failed-to-start child emits errorOccurred but not necessarily finished.
+    // Without this branch the launch dialog may remain at 0% forever.
+    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart || m_process != process) return;
+        const QString reason = process->errorString();
         m_process = nullptr;
+        process->deleteLater();
+        emit failed(reason);
+    });
+    connect(process, &QProcess::finished, this, [this, process](int code, QProcess::ExitStatus status) {
+        if (m_process != process) return;
+        readOutput();
+        // A progress receiver may have cancelled or restarted the installer.
+        if (m_process != process) return;
+        m_process = nullptr;
+        process->deleteLater();
         emit finished(status == QProcess::NormalExit && code == 0);
     });
-    m_process->start();
+    process->start();
 }
 
 void AssetInstaller::cancel() {
