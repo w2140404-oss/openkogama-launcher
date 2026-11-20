@@ -76,8 +76,8 @@ jobs:
       - name: Verify portable files and native Windows Qt startup
         run: |
           $required = @('openkogama-launcher.exe', 'Qt6Core.dll', 'Qt6Gui.dll',
-            'Qt6Widgets.dll', 'Qt6Network.dll', 'platforms/qwindows.dll',
-            'iconengines/qsvgicon.dll', 'tls/qschannelbackend.dll',
+            'Qt6Widgets.dll', 'Qt6Network.dll', 'qt.conf', 'plugins/platforms/qwindows.dll',
+            'plugins/iconengines/qsvgicon.dll', 'plugins/tls/qschannelbackend.dll',
             'msvcp140.dll', 'vcruntime140.dll')
           foreach ($file in $required) {
             if (!(Test-Path "portable/$file")) { throw "Missing portable dependency: $file" }
@@ -107,10 +107,11 @@ jobs:
           if ($log -notmatch 'after smoke window show' -or $log -notmatch 'event loop exited: 0') {
             throw 'Native Windows smoke test did not reach the expected phases'
           }
-          Get-ChildItem portable -File -Recurse | Sort-Object FullName | ForEach-Object {
+          $checksums = Get-ChildItem portable -File -Recurse | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object FullName | ForEach-Object {
             $relative = [IO.Path]::GetRelativePath("$PWD/portable", $_.FullName).Replace('\', '/')
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $relative"
-          } | Set-Content portable/SHA256SUMS.txt -Encoding ascii
+          }
+          $checksums | Set-Content portable/SHA256SUMS.txt -Encoding ascii
           "Built Qt $env:QT_VERSION Windows x64; regression tests and deployed native Qt smoke test passed. Wine 11.19 remains unverified." >> $env:GITHUB_STEP_SUMMARY
       - name: Upload portable test launcher
         uses: actions/upload-artifact@v4
