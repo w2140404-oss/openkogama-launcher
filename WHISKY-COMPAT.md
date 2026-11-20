@@ -2,7 +2,30 @@
 
 **Target**: Whisky 3.10.2 / WhiskyWine 4.8.3 (Wine 11.19), macOS on Apple Silicon.
 
-The existing launcher crashes during Qt GUI initialization in both an existing installation and a fresh Windows 10 bottle. Both supplied debugger reports identify `qt6gui+0x60397`, reached through `qwindows`. This narrows the investigation to Qt/platform initialization but does not identify the failing function or establish that dark-mode integration caused it. Offsets require the exact matching Qt DLL and symbols to interpret.
+The existing launcher crashes during Qt GUI initialization in both an existing installation and a fresh Windows 10 bottle. Both reported debugger traces identify `qt6gui+0x60397`, reached through `qwindows`. The startup tests and installed-DLL analysis below refine this diagnosis; dark-mode integration has not been established as its cause.
+
+## Verified startup: November 19, 2026
+
+[Actions run 44682326663](https://github.com/w2140404-oss/openkogama-launcher/actions/runs/44682326663) successfully built both portable artifacts from source commit `94a41a4961981c1cc1ef22be7778c2b70074beb3`. Both passed the regression suite, dependency checks, and the deployed native Windows Qt smoke test with the SDK removed from `PATH`. Downloaded ZIP digests and all 65 / 67 packaged file checksums were verified before Mac testing.
+
+The artifacts' `build-info.json` records their build-time Wine status; the Mac results below were collected afterward using those exact downloaded files.
+
+Mac tests used Apple M2, macOS 27.0.1, installed Whisky 3.10.2 / WhiskyWine 4.8.3, and runtime-reported Wine 11.19 in the clean Windows 10 bottle. Executables were invoked directly with the installed WhiskyWine `wine64` and that bottle's `WINEPREFIX`.
+
+| MSVC Qt build | Mac smoke, Wine default `darkmode=0` | Mac smoke, Qt defaults (`windows`) | Full diagnostic UI | Regular startup |
+|---|---|---|---|---|
+| 6.8.3 | Window shown, exit 0 | Window shown, exit 0 | User confirmed visible | Main window shown; event loop entered; closed cleanly |
+| 6.10.2 | Window shown, exit 0 | Window shown, exit 0 | User confirmed visible | Main window shown; event loop entered |
+
+Regular-startup tests used an empty test instances directory, so no game or server was launched. These results establish launcher startup on this Mac and bottle. Asset downloads, TLS behavior, game clients, and servers still need separate validation. Both full UI logs contain Schannel messages saying `Failed to enumerate ciphers`.
+
+### Original crash investigation
+
+The installed original `Qt6Gui.dll` is **Qt 6.10.2 MinGW**, SHA-256 `5a6a0971e71979520b01682ce7dcd5b4138ee95f208286ac45010050aa386d9d`; the working Qt 6.10.2 artifact uses the **MSVC** runtime. This means a Qt version change alone does not explain the successful startup.
+
+In that installed original DLL, RVA `0x60397` contains `movq (%rcx), %rax` in an unexported helper whose instructions match [`qt_pixmap_thread_test()` in Qt 6.10.2](https://github.com/qt/qtbase/blob/v6.10.2/src/gui/image/qpixmap.cpp#L45-L57). Import-table resolution identifies the preceding calls as `QCoreApplication::instanceExists()` and `QThread::isMainThread()`. The load feeding the fault resolves to the exported `QGuiApplicationPrivate::platform_integration` global, immediately before a virtual capability check.
+
+This maps the reported offset to a null platform-integration access in Qt's pixmap GUI-thread guard during initialization. Why the original process enters this branch remains unresolved; the new builds also change the toolchain, deployment, and updater bootstrap. Since both rebuilt versions pass with `QT_QPA_PLATFORM=windows`, the dark-mode change is not established as the explanation for their success. The scope of verification is startup, rather than complete Wine compatibility.
 
 ## Getting test executables
 
@@ -59,6 +82,6 @@ Once launcher startup is verified, asset installation can be tested separately. 
 
 ## Limitations
 
-- **Wine compatibility remains unverified until these exact executables are tested on the target Mac.** Successful Windows compilation or a native Windows smoke test does not establish Whisky/Wine compatibility.
+- **Verified scope: launcher startup on the Mac and bottle recorded above.** Downloads, HTTPS/TLS, game clients, and servers require further testing before broader Whisky/Wine compatibility can be claimed.
 - The Qt version matrix is intentionally exploratory. Resolving a crash may require symbols, a test build, or upstream Qt/Wine changes.
 - Do not distribute test builds as official OpenKoGaMa releases. This is a fork for debugging.
