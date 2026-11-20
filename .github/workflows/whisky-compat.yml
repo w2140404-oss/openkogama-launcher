@@ -44,7 +44,7 @@ jobs:
       - name: Configure launcher only
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo `
-            -DCMAKE_CXX_COMPILER=cl -DCMAKE_INSTALL_BINDIR=. `
+            -DCMAKE_CXX_COMPILER=cl "-DCMAKE_INSTALL_BINDIR=." `
             -DOPENKOGAMA_PORTABLE_TEST_BUILD=ON -DBUILD_TESTING=ON `
             "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR" `
             "-DOPENKOGAMA_BUILD_REVISION=$env:GITHUB_SHA"
