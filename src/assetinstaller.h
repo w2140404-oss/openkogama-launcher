@@ -19,6 +19,7 @@ public:
 signals:
     void progress(qint64 done, qint64 total);
     void finished(bool ok);
+    void failed(const QString &reason);
 
 private:
     void readOutput();
