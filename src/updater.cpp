@@ -7,6 +7,24 @@
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QMessageBox>
+
+#ifdef OPENKOGAMA_PORTABLE_TEST_BUILD
+
+// Test artifacts must never bootstrap or replace themselves with upstream releases.
+void Updater::startup() {}
+
+QString Updater::version() {
+    return QStringLiteral("Whisky test (Qt ") + QString::fromLatin1(qVersion()) + ')';
+}
+
+void Updater::check(QWidget *window, QAction *, bool asked) {
+    if (asked)
+        QMessageBox::information(window, QCoreApplication::translate("Updater", "Update"),
+            QCoreApplication::translate("Updater", "Updates are disabled in this portable compatibility build."));
+}
+
+#else
+
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QPointer>
@@ -156,3 +174,5 @@ void Updater::check(QWidget *window, QAction *action, bool asked) {
     });
     watcher->setFuture(QtConcurrent::run(download, guard));
 }
+
+#endif
