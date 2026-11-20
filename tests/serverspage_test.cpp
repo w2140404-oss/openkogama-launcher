@@ -6,6 +6,7 @@
 #include "paths.h"
 #include "gamelauncher.h"
 #include "centereddelegate.h"
+#include "assetinstaller.h"
 #include <QApplication>
 #include <QBuffer>
 #include <QDir>
@@ -26,6 +27,7 @@
 #include <QPushButton>
 #include <QShortcut>
 #include <QSignalSpy>
+#include <QScopeGuard>
 #include <QPointer>
 #include <QProcess>
 #include <QStandardPaths>
@@ -327,6 +329,33 @@ private slots:
         QCOMPARE(shown.value("title").toString(), QString("Test"));
         QVERIFY(shown.contains("public") && !shown.value("public").toBool());
         QVERIFY(QFile::remove(QDir(Paths::serverData()).filePath("server.json")));
+    }
+
+    void assetInstallerFailedToStartAndRetry()
+    {
+        const QString server = Paths::server();
+        QVERIFY(QDir().mkpath(server));
+        const auto cleanup = qScopeGuard([server]() { QDir(server).removeRecursively(); });
+        QFile executable(server + "/openkogama-server.exe");
+        QVERIFY(executable.open(QIODevice::WriteOnly));
+        executable.write("This is deliberately not a Windows executable.\n");
+        executable.close();
+
+        AssetInstaller installer;
+        QSignalSpy failed(&installer, &AssetInstaller::failed);
+        QSignalSpy finished(&installer, &AssetInstaller::finished);
+        installer.start("test");
+        QTRY_COMPARE(failed.size(), 1);
+        QVERIFY(!failed.first().first().toString().isEmpty());
+        QCOMPARE(finished.size(), 0);
+        installer.start("test");
+        QTRY_COMPARE(failed.size(), 2);
+        QCOMPARE(finished.size(), 0);
+
+        QVERIFY(executable.remove());
+        installer.start("test");
+        QCOMPARE(finished.size(), 1);
+        QCOMPARE(finished.first().first().toBool(), false);
     }
 
     void cleanupTestCase()
