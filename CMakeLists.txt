@@ -11,6 +11,11 @@ endif()
 option(OPENKOGAMA_PORTABLE_TEST_BUILD "Build a standalone launcher without the release updater" OFF)
 set(OPENKOGAMA_BUILD_REVISION "local" CACHE STRING "Source revision recorded in startup diagnostics")
 include(GNUInstallDirs)
+# Treat an explicitly empty runtime path as the install prefix itself.
+# install(TARGETS) accepts its default, but install(FILES) requires a destination.
+if("${CMAKE_INSTALL_BINDIR}" STREQUAL "")
+    set(CMAKE_INSTALL_BINDIR ".")
+endif()
 if(MSVC)
     add_compile_options(/utf-8)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
@@ -127,7 +132,7 @@ qt_add_translations(openkogama-launcher
 
 install(TARGETS openkogama-launcher
     BUNDLE  DESTINATION .
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
@@ -138,13 +143,13 @@ qt_generate_deploy_app_script(
 )
 install(SCRIPT ${deploy_script})
 if(NOT OPENKOGAMA_PORTABLE_TEST_BUILD)
-    install(FILES $<TARGET_FILE:velopack> DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES $<TARGET_FILE:velopack> DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
 if(MSVC AND OPENKOGAMA_PORTABLE_TEST_BUILD)
     # windeployqt may provide a redist installer. Portable tests need app-local DLLs.
     set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION ${CMAKE_INSTALL_BINDIR})
     include(InstallRequiredSystemLibraries)
-    install(FILES $<TARGET_PDB_FILE:openkogama-launcher> DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
+    install(FILES $<TARGET_PDB_FILE:openkogama-launcher> DESTINATION "${CMAKE_INSTALL_BINDIR}" OPTIONAL)
 endif()
 
 option(BUILD_TESTING "Build launcher tests" OFF)
